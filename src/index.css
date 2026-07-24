@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-ink text-mist font-body antialiased;
+  }
+  h1, h2, h3, h4 {
+    @apply font-display;
+  }
+  ::selection {
+    background: rgba(232,135,58,0.35);
+  }
+  *:focus-visible {
+    outline: 2px solid #45D6C6;
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .btn-ember {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-ember px-5 py-2.5 font-semibold text-ink transition-all hover:bg-ember-light hover:shadow-ember active:scale-[0.98];
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line px-5 py-2.5 font-semibold text-mist transition-colors hover:border-teal hover:text-teal;
+  }
+  .card {
+    @apply rounded-xl border border-line bg-surface;
+  }
+  .input-field {
+    @apply w-full rounded-lg border border-line bg-surface2 px-4 py-2.5 text-mist placeholder:text-slate focus:border-teal focus:outline-none transition-colors;
+  }
+  .eyebrow {
+    @apply text-xs font-mono uppercase tracking-[0.2em] text-teal;
+  }
+  .tag-pill {
+    @apply rounded-full border border-line bg-surface2 px-3 py-1 text-xs text-slate;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
