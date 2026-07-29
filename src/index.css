@@ -13,10 +13,10 @@
     @apply font-display;
   }
   ::selection {
-    background: rgba(232,135,58,0.35);
+    background: rgba(41,82,227,0.18);
   }
   *:focus-visible {
-    outline: 2px solid #45D6C6;
+    outline: 2px solid #0D9488;
     outline-offset: 2px;
   }
 }
@@ -29,7 +29,7 @@
     @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line px-5 py-2.5 font-semibold text-mist transition-colors hover:border-teal hover:text-teal;
   }
   .card {
-    @apply rounded-xl border border-line bg-surface;
+    @apply rounded-xl border border-line bg-surface shadow-card;
   }
   .input-field {
     @apply w-full rounded-lg border border-line bg-surface2 px-4 py-2.5 text-mist placeholder:text-slate focus:border-teal focus:outline-none transition-colors;

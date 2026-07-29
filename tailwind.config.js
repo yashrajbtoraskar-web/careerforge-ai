@@ -4,20 +4,20 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: "#10141B",
-        surface: "#1A2129",
-        surface2: "#212A34",
-        line: "#2B3542",
-        mist: "#ECEFF4",
-        slate: "#94A0B2",
+        ink: "#F6F7F9",
+        surface: "#FFFFFF",
+        surface2: "#F1F4F8",
+        line: "#E1E5EB",
+        mist: "#111827",
+        slate: "#64748B",
         ember: {
-          DEFAULT: "#E8873A",
-          dark: "#C96A28",
-          light: "#F4A868",
+          DEFAULT: "#2952E3",
+          dark: "#1E3FB8",
+          light: "#4E70EE",
         },
         teal: {
-          DEFAULT: "#45D6C6",
-          dark: "#2AA99B",
+          DEFAULT: "#0D9488",
+          dark: "#0B7A70",
         },
       },
       fontFamily: {
@@ -26,10 +26,11 @@ export default {
         mono: ["'JetBrains Mono'", "monospace"],
       },
       backgroundImage: {
-        "ember-glow": "radial-gradient(circle at 30% 20%, rgba(232,135,58,0.18), transparent 60%)",
+        "ember-glow": "radial-gradient(circle at 30% 20%, rgba(41,82,227,0.10), transparent 60%)",
       },
       boxShadow: {
-        ember: "0 0 0 1px rgba(232,135,58,0.25), 0 8px 24px -8px rgba(232,135,58,0.35)",
+        ember: "0 0 0 1px rgba(41,82,227,0.25), 0 8px 24px -8px rgba(41,82,227,0.35)",
+        card: "0 1px 2px rgba(17,24,39,0.04), 0 1px 3px rgba(17,24,39,0.06)",
       },
       keyframes: {
         spark: {

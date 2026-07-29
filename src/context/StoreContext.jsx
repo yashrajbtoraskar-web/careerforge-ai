@@ -1,14 +1,15 @@
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { ALL_JOBS, matchScore } from "../data/jobs";
 
 const StoreContext = createContext(null);
 
 const LS_USERS = "cf_users";
 const LS_SESSION = "cf_session";
-const LS_APPS_PREFIX = "cf_apps_";
+const LS_ALL_APPS = "cf_all_applications"; // single shared source of truth for every user's applications
 const LS_RESUME_PREFIX = "cf_resume_";
-const LS_ALL_APPS = "cf_all_applications";
-const LS_NOTIF_PREFIX = "cf_notif_";
+
+const STAGES = ["Submitted", "Under Review", "Interview", "Offer"];
+const AUTO_REFRESH_MS = 2500;
 
 function readJSON(key, fallback) {
   try {
@@ -20,6 +21,9 @@ function readJSON(key, fallback) {
 }
 function writeJSON(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
+  // Let other parts of the same tab know data changed immediately (native "storage"
+  // events only fire in *other* tabs, not the one that made the change).
+  window.dispatchEvent(new CustomEvent("cf-data-changed", { detail: { key } }));
 }
 
 function seedUsersIfEmpty() {
@@ -52,31 +56,42 @@ export function StoreProvider({ children }) {
   const [session, setSession] = useState(() => readJSON(LS_SESSION, null));
   const [resumeSkills, setResumeSkills] = useState([]);
   const [resumeName, setResumeName] = useState("");
-  const [applications, setApplications] = useState([]);
-  const [notifications, setNotifications] = useState([]);
   const [allApplications, setAllApplications] = useState(() => readJSON(LS_ALL_APPS, []));
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
 
-  // Load per-user data whenever session changes
+  // Load per-user resume whenever session changes
   useEffect(() => {
     if (!session) {
       setResumeSkills([]);
       setResumeName("");
-      setApplications([]);
-      setNotifications([]);
       return;
     }
     const resumeData = readJSON(LS_RESUME_PREFIX + session.id, { skills: [], fileName: "" });
     setResumeSkills(resumeData.skills || []);
     setResumeName(resumeData.fileName || "");
-    setApplications(readJSON(LS_APPS_PREFIX + session.id, []));
-    setNotifications(readJSON(LS_NOTIF_PREFIX + session.id, []));
   }, [session]);
 
-  // Refresh the global applicant list (used by Admin) whenever we come back to the tab/window
+  // Keep the shared applications list in sync automatically — polling covers same-tab
+  // updates made elsewhere in the app, and the storage/cf-data-changed listeners give
+  // near-instant updates when the admin (or the user, in another tab) changes something.
   useEffect(() => {
     const refresh = () => setAllApplications(readJSON(LS_ALL_APPS, []));
-    window.addEventListener("focus", refresh);
-    return () => window.removeEventListener("focus", refresh);
+    refresh();
+    const interval = setInterval(refresh, AUTO_REFRESH_MS);
+    const onStorage = (e) => {
+      if (!e.key || e.key === LS_ALL_APPS) refresh();
+    };
+    const onCustom = (e) => {
+      if (!e.detail?.key || e.detail.key === LS_ALL_APPS) refresh();
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("cf-data-changed", onCustom);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("cf-data-changed", onCustom);
+    };
   }, []);
 
   const persistUsers = (next) => {
@@ -128,123 +143,73 @@ export function StoreProvider({ children }) {
     [session]
   );
 
-  const persistApplications = (next) => {
-    setApplications(next);
-    if (session) writeJSON(LS_APPS_PREFIX + session.id, next);
-  };
+  // applications = only the logged-in user's own applications, derived from the shared list
+  const applications = session ? allApplications.filter((a) => a.userId === session.id) : [];
 
   const hasApplied = useCallback(
     (jobId) => applications.some((a) => a.jobId === jobId),
     [applications]
   );
 
-  const persistAllApplications = (next) => {
-    setAllApplications(next);
-    writeJSON(LS_ALL_APPS, next);
-  };
-
-  const pushNotification = (userId, notif) => {
-    const key = LS_NOTIF_PREFIX + userId;
-    const existing = readJSON(key, []);
-    const next = [{ id: `N-${Date.now()}`, read: false, createdAt: Date.now(), ...notif }, ...existing];
-    writeJSON(key, next);
-    if (session && session.id === userId) setNotifications(next);
-  };
-
   const createApplication = useCallback(
     (job) => {
+      if (!session) return null;
       const record = {
         id: `APP-${Date.now()}`,
+        userId: session.id,
+        userName: session.name,
+        userEmail: session.email,
         jobId: job.id,
         title: job.title,
         company: job.company,
         city: job.city,
         matchScore: matchScore(resumeSkills, job.skills),
         stage: "Submitted",
-        status: "Applied", // Applied | Shortlisted | Rejected
-        applicantId: session?.id,
-        applicantName: session?.name,
-        applicantEmail: session?.email,
         history: [{ stage: "Submitted", at: Date.now() }],
         createdAt: Date.now(),
       };
-      const next = [record, ...applications];
-      persistApplications(next);
-      persistAllApplications([record, ...allApplications]);
+      const current = readJSON(LS_ALL_APPS, []);
+      const next = [record, ...current];
+      writeJSON(LS_ALL_APPS, next);
+      setAllApplications(next);
       return record;
     },
-    [applications, allApplications, resumeSkills, session]
+    [resumeSkills, session]
   );
 
-  // Admin action: mark a candidate as Shortlisted or Rejected, and notify them
-  const updateApplicationStatus = useCallback(
-    (appId, status) => {
-      const target = allApplications.find((a) => a.id === appId);
-      if (!target) return;
+  // Admin-only: set any application to any stage (used by the admin console).
+  const setApplicationStage = useCallback((appId, stage) => {
+    const current = readJSON(LS_ALL_APPS, []);
+    const next = current.map((a) => {
+      if (a.id !== appId || a.stage === stage) return a;
+      return { ...a, stage, history: [...a.history, { stage, at: Date.now() }] };
+    });
+    writeJSON(LS_ALL_APPS, next);
+    setAllApplications(next);
+  }, []);
 
-      const nextAll = allApplications.map((a) =>
-        a.id === appId
-          ? { ...a, status, history: [...a.history, { stage: status, at: Date.now() }] }
-          : a
-      );
-      persistAllApplications(nextAll);
-
-      // Sync the applicant's own copy of this application (for their /applications view)
-      if (target.applicantId) {
-        const theirKey = LS_APPS_PREFIX + target.applicantId;
-        const theirApps = readJSON(theirKey, []);
-        const updatedTheirApps = theirApps.map((a) =>
-          a.id === appId
-            ? { ...a, status, history: [...a.history, { stage: status, at: Date.now() }] }
-            : a
-        );
-        writeJSON(theirKey, updatedTheirApps);
-        if (session?.id === target.applicantId) setApplications(updatedTheirApps);
-
-        pushNotification(target.applicantId, {
-          type: status === "Shortlisted" ? "shortlisted" : "rejected",
-          message:
-            status === "Shortlisted"
-              ? `Good news! You've been shortlisted for ${target.title} at ${target.company}.`
-              : `Update: You were not selected for ${target.title} at ${target.company}.`,
-          jobTitle: target.title,
-          company: target.company,
-        });
-      }
-    },
-    [allApplications, session]
-  );
-
-  const markNotificationsRead = useCallback(() => {
-    if (!session) return;
-    const next = notifications.map((n) => ({ ...n, read: true }));
-    setNotifications(next);
-    writeJSON(LS_NOTIF_PREFIX + session.id, next);
-  }, [notifications, session]);
-
-  const advanceApplication = useCallback(
-    (appId) => {
-      const stages = ["Submitted", "Under Review", "Interview", "Offer"];
-      const next = applications.map((a) => {
-        if (a.id !== appId) return a;
-        const idx = stages.indexOf(a.stage);
-        if (idx === -1 || idx >= stages.length - 1) return a;
-        const nextStage = stages[idx + 1];
-        return { ...a, stage: nextStage, history: [...a.history, { stage: nextStage, at: Date.now() }] };
-      });
-      persistApplications(next);
-    },
-    [applications]
-  );
+  // Admin-only: move an application one stage forward.
+  const advanceApplication = useCallback((appId) => {
+    const current = readJSON(LS_ALL_APPS, []);
+    const target = current.find((a) => a.id === appId);
+    if (!target) return;
+    const idx = STAGES.indexOf(target.stage);
+    if (idx === -1 || idx >= STAGES.length - 1) return;
+    const next = current.map((a) =>
+      a.id === appId
+        ? { ...a, stage: STAGES[idx + 1], history: [...a.history, { stage: STAGES[idx + 1], at: Date.now() }] }
+        : a
+    );
+    writeJSON(LS_ALL_APPS, next);
+    setAllApplications(next);
+  }, []);
 
   const isAdmin = session?.role === "admin";
 
   const adminStats = {
     totalUsers: users.filter((u) => u.role !== "admin").length,
     totalJobs: ALL_JOBS.length,
-    totalApplications: Object.keys(localStorage)
-      .filter((k) => k.startsWith(LS_APPS_PREFIX))
-      .reduce((sum, k) => sum + readJSON(k, []).length, 0),
+    totalApplications: allApplications.length,
   };
 
   const value = {
@@ -257,16 +222,14 @@ export function StoreProvider({ children }) {
     resumeName,
     saveResume,
     applications,
+    allApplications, // full shared list — used by the admin console to see every candidate
     createApplication,
     advanceApplication,
+    setApplicationStage,
     hasApplied,
     adminStats,
     AGENT_STEPS,
-    allApplications,
-    updateApplicationStatus,
-    notifications,
-    unreadNotifCount: notifications.filter((n) => !n.read).length,
-    markNotificationsRead,
+    STAGES,
   };
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

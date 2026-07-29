@@ -1,19 +1,19 @@
 import { Link } from "react-router-dom";
-import { RefreshCcw, Inbox, CheckCircle2, XCircle } from "lucide-react";
+import { Clock, Inbox } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 
 const STAGES = ["Submitted", "Under Review", "Interview", "Offer"];
 
 export default function Applications() {
-  const { applications, advanceApplication } = useStore();
+  const { applications } = useStore();
 
   return (
     <div className="mx-auto max-w-4xl px-5 py-12 sm:px-8">
       <span className="eyebrow">Tracker Agent</span>
       <h1 className="mt-2 font-display text-3xl font-semibold text-mist">Your applications</h1>
       <p className="mt-2 text-sm text-slate">
-        Every application submitted through the pipeline shows up here. The Tracker Agent checks each
-        one for status changes — tap "Check for update" to simulate its next poll.
+        Every application submitted through the pipeline shows up here. Status updates automatically
+        as the employer/admin reviews your application — no action needed from you.
       </p>
 
       {applications.length === 0 ? (
@@ -28,7 +28,7 @@ export default function Applications() {
         <div className="mt-8 flex flex-col gap-4">
           {applications.map((app) => {
             const idx = STAGES.indexOf(app.stage);
-            const maxed = idx === STAGES.length - 1;
+            const lastUpdate = app.history?.[app.history.length - 1]?.at ?? app.createdAt;
             return (
               <div key={app.id} className="card p-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -38,21 +38,9 @@ export default function Applications() {
                       {app.company} · {app.city}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {app.status === "Shortlisted" && (
-                      <span className="flex items-center gap-1 rounded-full bg-teal/10 px-2.5 py-1 text-xs font-semibold text-teal">
-                        <CheckCircle2 size={13} /> Shortlisted
-                      </span>
-                    )}
-                    {app.status === "Rejected" && (
-                      <span className="flex items-center gap-1 rounded-full bg-red-500/10 px-2.5 py-1 text-xs font-semibold text-red-400">
-                        <XCircle size={13} /> Not selected
-                      </span>
-                    )}
-                    <span className="rounded-full bg-ember/10 px-2.5 py-1 text-xs font-semibold text-ember">
-                      {app.matchScore}% match
-                    </span>
-                  </div>
+                  <span className="rounded-full bg-ember/10 px-2.5 py-1 text-xs font-semibold text-ember">
+                    {app.matchScore}% match
+                  </span>
                 </div>
 
                 <div className="mt-5">
@@ -80,13 +68,9 @@ export default function Applications() {
                   <p className="text-xs text-slate">
                     Submitted {new Date(app.createdAt).toLocaleDateString()}
                   </p>
-                  <button
-                    onClick={() => advanceApplication(app.id)}
-                    disabled={maxed}
-                    className="btn-ghost !px-3 !py-1.5 text-xs disabled:opacity-40"
-                  >
-                    <RefreshCcw size={13} /> {maxed ? "Final stage reached" : "Check for update"}
-                  </button>
+                  <span className="flex items-center gap-1.5 text-xs text-slate">
+                    <Clock size={13} /> Last updated {new Date(lastUpdate).toLocaleString()}
+                  </span>
                 </div>
               </div>
             );

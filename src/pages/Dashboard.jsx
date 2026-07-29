@@ -4,7 +4,7 @@ import { FileText, Briefcase, Send, TrendingUp } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { ALL_JOBS, matchScore } from "../data/jobs";
 
-const STAGE_COLORS = { Submitted: "#94A0B2", "Under Review": "#45D6C6", Interview: "#E8873A", Offer: "#F4A868" };
+const STAGE_COLORS = { Submitted: "#94A0B2", "Under Review": "#0D9488", Interview: "#2952E3", Offer: "#16A34A" };
 
 export default function Dashboard() {
   const { session, resumeSkills, applications } = useStore();
@@ -64,7 +64,7 @@ export default function Dashboard() {
                       <Cell key={entry.name} fill={STAGE_COLORS[entry.name]} stroke="none" />
                     ))}
                   </Pie>
-                  <Tooltip contentStyle={{ background: "#1A2129", border: "1px solid #2B3542", borderRadius: 8, color: "#ECEFF4" }} />
+                  <Tooltip contentStyle={{ background: "#FFFFFF", border: "1px solid #E1E5EB", borderRadius: 8, color: "#111827" }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -87,11 +87,11 @@ export default function Dashboard() {
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={matchBuckets}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2B3542" vertical={false} />
-                  <XAxis dataKey="name" stroke="#94A0B2" fontSize={12} />
-                  <YAxis stroke="#94A0B2" fontSize={12} />
-                  <Tooltip contentStyle={{ background: "#1A2129", border: "1px solid #2B3542", borderRadius: 8, color: "#ECEFF4" }} />
-                  <Bar dataKey="value" fill="#E8873A" radius={[6, 6, 0, 0]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E1E5EB" vertical={false} />
+                  <XAxis dataKey="name" stroke="#64748B" fontSize={12} />
+                  <YAxis stroke="#64748B" fontSize={12} />
+                  <Tooltip contentStyle={{ background: "#FFFFFF", border: "1px solid #E1E5EB", borderRadius: 8, color: "#111827" }} />
+                  <Bar dataKey="value" fill="#2952E3" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
