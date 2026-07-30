@@ -4,14 +4,14 @@ import { FileText, Briefcase, Send, TrendingUp } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { ALL_JOBS, matchScore } from "../data/jobs";
 
-const STAGE_COLORS = { Submitted: "#94A0B2", "Under Review": "#0D9488", Interview: "#2952E3", Offer: "#16A34A" };
+const STAGE_COLORS = { Submitted: "#94A0B2", "Under Review": "#0D9488", Interview: "#2952E3", Offer: "#16A34A", Rejected: "#DC2626" };
 
 export default function Dashboard() {
   const { session, resumeSkills, applications } = useStore();
 
   const strongMatches = ALL_JOBS.filter((j) => matchScore(resumeSkills, j.skills) >= 60).length;
 
-  const stageData = ["Submitted", "Under Review", "Interview", "Offer"].map((stage) => ({
+  const stageData = ["Submitted", "Under Review", "Interview", "Offer", "Rejected"].map((stage) => ({
     name: stage,
     value: applications.filter((a) => a.stage === stage).length,
   }));

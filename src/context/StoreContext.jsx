@@ -8,8 +8,13 @@ const LS_SESSION = "cf_session";
 const LS_ALL_APPS = "cf_all_applications"; // single shared source of truth for every user's applications
 const LS_RESUME_PREFIX = "cf_resume_";
 
-const STAGES = ["Submitted", "Under Review", "Interview", "Offer"];
+const STAGES = ["Submitted", "Under Review", "Interview", "Offer"]; // linear progress path
+const TERMINAL_STAGES = ["Rejected"]; // outside the linear path
 const AUTO_REFRESH_MS = 2500;
+
+function makeRoomId(appId) {
+  return `cf-room-${appId}`.replace(/[^a-zA-Z0-9-]/g, "");
+}
 
 function readJSON(key, fallback) {
   try {
@@ -178,11 +183,16 @@ export function StoreProvider({ children }) {
   );
 
   // Admin-only: set any application to any stage (used by the admin console).
+  // Automatically creates an interview room the first time a candidate is moved to "Interview".
   const setApplicationStage = useCallback((appId, stage) => {
     const current = readJSON(LS_ALL_APPS, []);
     const next = current.map((a) => {
       if (a.id !== appId || a.stage === stage) return a;
-      return { ...a, stage, history: [...a.history, { stage, at: Date.now() }] };
+      const patch = { ...a, stage, history: [...a.history, { stage, at: Date.now() }] };
+      if (stage === "Interview" && !patch.interviewRoomId) {
+        patch.interviewRoomId = makeRoomId(a.id);
+      }
+      return patch;
     });
     writeJSON(LS_ALL_APPS, next);
     setAllApplications(next);
@@ -230,6 +240,8 @@ export function StoreProvider({ children }) {
     adminStats,
     AGENT_STEPS,
     STAGES,
+    TERMINAL_STAGES,
+    getApplicationById: (id) => allApplications.find((a) => a.id === id) || null,
   };
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "lucide-react": "^1.26.0",
+    "peerjs": "^1.5.5",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.1",
@@ -26,5 +27,5 @@
     "tailwindcss": "^3.4.19",
     "vite": "^8.1.1"
   },
-  "description": "CareerForge AI - Autonomous Multi-Agent Job Application Engine (MCA Major Project)"
+  "description": "CareerForge AI - Autonomous Multi-Agent Job Application Engine (Yash & Prerna Final Year Project)"
 }

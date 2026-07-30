@@ -1,6 +1,6 @@
 # CareerForge AI
 ### Autonomous Multi-Agent Job Application & Career Optimization Engine
-*MCA Major Project*
+*Yash & Prerna — Final Year Project*
 
 ---
 

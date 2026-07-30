@@ -12,6 +12,7 @@ import ResumeUpload from "./pages/ResumeUpload";
 import Jobs from "./pages/Jobs";
 import JobDetail from "./pages/JobDetail";
 import Applications from "./pages/Applications";
+import Interview from "./pages/Interview";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
@@ -49,6 +50,14 @@ export default function App() {
                 element={
                   <ProtectedRoute>
                     <Applications />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/interview/:appId"
+                element={
+                  <ProtectedRoute>
+                    <Interview />
                   </ProtectedRoute>
                 }
               />

@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Users, Briefcase, Send, ShieldCheck, Search } from "lucide-react";
+import { Users, Briefcase, Send, ShieldCheck, Search, Video } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { ALL_JOBS } from "../data/jobs";
 
@@ -9,10 +10,20 @@ const STAGE_STYLES = {
   "Under Review": "bg-teal/10 text-teal",
   Interview: "bg-ember/10 text-ember",
   Offer: "bg-emerald-500/10 text-emerald-600",
+  Rejected: "bg-red-500/10 text-red-600",
 };
 
+// The buttons shown per row in the admin table. Each maps to a stage the admin can set directly.
+const ADMIN_ACTIONS = [
+  { stage: "Under Review", label: "Review", style: "hover:border-teal hover:text-teal" },
+  { stage: "Interview", label: "Interview", style: "hover:border-ember hover:text-ember" },
+  { stage: "Offer", label: "Offer", style: "hover:border-emerald-500 hover:text-emerald-600" },
+  { stage: "Rejected", label: "Reject", style: "hover:border-red-500 hover:text-red-600" },
+];
+
 export default function Admin() {
-  const { adminStats, session, allApplications, setApplicationStage, STAGES } = useStore();
+  const { adminStats, session, allApplications, setApplicationStage, STAGES, TERMINAL_STAGES } = useStore();
+  const allStages = [...STAGES, ...TERMINAL_STAGES];
   const [query, setQuery] = useState("");
   const [stageFilter, setStageFilter] = useState("All");
 
@@ -91,7 +102,7 @@ export default function Admin() {
               className="input-field !py-2 text-sm sm:w-40"
             >
               <option value="All">All stages</option>
-              {STAGES.map((s) => (
+              {allStages.map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>
@@ -112,7 +123,7 @@ export default function Admin() {
                   <th className="py-3 pr-3 font-medium">Match</th>
                   <th className="py-3 pr-3 font-medium">Applied on</th>
                   <th className="py-3 pr-3 font-medium">Status</th>
-                  <th className="py-3 pr-3 font-medium">Update status</th>
+                  <th className="py-3 pr-3 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -134,19 +145,28 @@ export default function Admin() {
                       <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STAGE_STYLES[a.stage] || "bg-slate/10 text-slate"}`}>
                         {a.stage}
                       </span>
+                      {a.stage === "Interview" && a.interviewRoomId && (
+                        <Link
+                          to={`/interview/${a.id}`}
+                          className="mt-1.5 flex w-fit items-center gap-1 text-xs font-semibold text-ember hover:underline"
+                        >
+                          <Video size={12} /> Join interview
+                        </Link>
+                      )}
                     </td>
                     <td className="py-3 pr-3">
-                      <select
-                        value={a.stage}
-                        onChange={(e) => setApplicationStage(a.id, e.target.value)}
-                        className="input-field !w-auto !py-1.5 text-xs"
-                      >
-                        {STAGES.map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
+                      <div className="flex flex-wrap gap-1.5">
+                        {ADMIN_ACTIONS.map((act) => (
+                          <button
+                            key={act.stage}
+                            onClick={() => setApplicationStage(a.id, act.stage)}
+                            disabled={a.stage === act.stage}
+                            className={`rounded-md border border-line px-2.5 py-1 text-xs font-medium text-slate transition-colors disabled:cursor-default disabled:opacity-40 ${act.style}`}
+                          >
+                            {act.label}
+                          </button>
                         ))}
-                      </select>
+                      </div>
                     </td>
                   </tr>
                 ))}

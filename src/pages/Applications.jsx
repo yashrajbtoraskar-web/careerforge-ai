@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Clock, Inbox } from "lucide-react";
+import { Clock, Inbox, Video } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 
 const STAGES = ["Submitted", "Under Review", "Interview", "Offer"];
@@ -27,6 +27,7 @@ export default function Applications() {
       ) : (
         <div className="mt-8 flex flex-col gap-4">
           {applications.map((app) => {
+            const isRejected = app.stage === "Rejected";
             const idx = STAGES.indexOf(app.stage);
             const lastUpdate = app.history?.[app.history.length - 1]?.at ?? app.createdAt;
             return (
@@ -43,26 +44,44 @@ export default function Applications() {
                   </span>
                 </div>
 
-                <div className="mt-5">
-                  <div className="flex justify-between">
-                    {STAGES.map((s, i) => (
-                      <span
-                        key={s}
-                        className={`text-[11px] font-mono uppercase tracking-wide ${
-                          i <= idx ? "text-teal" : "text-slate"
-                        }`}
-                      >
-                        {s}
-                      </span>
-                    ))}
+                {isRejected ? (
+                  <div className="mt-5 rounded-lg bg-red-500/10 px-4 py-3">
+                    <p className="text-sm font-semibold text-red-600">Not moving forward</p>
+                    <p className="mt-0.5 text-xs text-red-600/80">
+                      The employer has closed this application. Keep exploring — new roles are added regularly.
+                    </p>
                   </div>
-                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface2">
-                    <div
-                      className="h-full rounded-full bg-teal transition-all"
-                      style={{ width: `${((idx + 1) / STAGES.length) * 100}%` }}
-                    />
+                ) : (
+                  <div className="mt-5">
+                    <div className="flex justify-between">
+                      {STAGES.map((s, i) => (
+                        <span
+                          key={s}
+                          className={`text-[11px] font-mono uppercase tracking-wide ${
+                            i <= idx ? "text-teal" : "text-slate"
+                          }`}
+                        >
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface2">
+                      <div
+                        className="h-full rounded-full bg-teal transition-all"
+                        style={{ width: `${((idx + 1) / STAGES.length) * 100}%` }}
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {app.stage === "Interview" && app.interviewRoomId && (
+                  <Link
+                    to={`/interview/${app.id}`}
+                    className="btn-ember mt-5 flex w-fit items-center gap-2 !py-2 text-sm"
+                  >
+                    <Video size={15} /> Join your interview
+                  </Link>
+                )}
 
                 <div className="mt-5 flex items-center justify-between">
                   <p className="text-xs text-slate">
