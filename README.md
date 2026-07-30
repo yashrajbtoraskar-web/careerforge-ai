@@ -1,6 +1,7 @@
 # CareerForge AI
 ### Autonomous Multi-Agent Job Application & Career Optimization Engine
 *Yash & Prerna — Final Year Project*
+🌐 Live App: https://careerforge-ai-yash-prerna-symca.vercel.app/
 
 ---
 
