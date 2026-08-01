@@ -1,51 +1,14 @@
-import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import { ALL_JOBS, matchScore } from "../data/jobs";
 
 const StoreContext = createContext(null);
 
-const LS_USERS = "cf_users";
-const LS_SESSION = "cf_session";
-const LS_ALL_APPS = "cf_all_applications"; // single shared source of truth for every user's applications
-const LS_RESUME_PREFIX = "cf_resume_";
-
 const STAGES = ["Submitted", "Under Review", "Interview", "Offer"]; // linear progress path
 const TERMINAL_STAGES = ["Rejected"]; // outside the linear path
-const AUTO_REFRESH_MS = 2500;
 
 function makeRoomId(appId) {
   return `cf-room-${appId}`.replace(/[^a-zA-Z0-9-]/g, "");
-}
-
-function readJSON(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-function writeJSON(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
-  // Let other parts of the same tab know data changed immediately (native "storage"
-  // events only fire in *other* tabs, not the one that made the change).
-  window.dispatchEvent(new CustomEvent("cf-data-changed", { detail: { key } }));
-}
-
-function seedUsersIfEmpty() {
-  const users = readJSON(LS_USERS, null);
-  if (users) return users;
-  const seeded = [
-    {
-      id: "admin-1",
-      name: "Platform Admin",
-      email: "admin@careerforge.ai",
-      password: "admin123",
-      role: "admin",
-      createdAt: Date.now(),
-    },
-  ];
-  writeJSON(LS_USERS, seeded);
-  return seeded;
 }
 
 const AGENT_STEPS = [
@@ -56,171 +19,252 @@ const AGENT_STEPS = [
   { key: "tracker", label: "Tracker Agent", verb: "Registering application in the tracking pipeline" },
 ];
 
+function mapAppRow(r) {
+  return {
+    id: r.id,
+    userId: r.user_id,
+    userName: r.user_name,
+    userEmail: r.user_email,
+    jobId: r.job_id,
+    title: r.title,
+    company: r.company,
+    city: r.city,
+    matchScore: r.match_score,
+    stage: r.stage,
+    history: r.history || [],
+    interviewRoomId: r.interview_room_id,
+    createdAt: new Date(r.created_at).getTime(),
+  };
+}
+
 export function StoreProvider({ children }) {
-  const [users, setUsers] = useState(() => seedUsersIfEmpty());
-  const [session, setSession] = useState(() => readJSON(LS_SESSION, null));
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [resumeSkills, setResumeSkills] = useState([]);
   const [resumeName, setResumeName] = useState("");
-  const [allApplications, setAllApplications] = useState(() => readJSON(LS_ALL_APPS, []));
-  const sessionRef = useRef(session);
-  sessionRef.current = session;
+  const [allApplications, setAllApplications] = useState([]);
+  const [registeredUsers, setRegisteredUsers] = useState([]);
 
-  // Load per-user resume whenever session changes
+  const loadProfile = useCallback(async (authUser) => {
+    if (!authUser) {
+      setSession(null);
+      return;
+    }
+    const { data: profile } = await supabase.from("profiles").select("*").eq("id", authUser.id).maybeSingle();
+    setSession({
+      id: authUser.id,
+      name: profile?.name || authUser.email,
+      email: authUser.email,
+      role: profile?.role || "user",
+    });
+  }, []);
+
+  // Bootstrap auth session on load, then keep it in sync
   useEffect(() => {
-    if (!session) {
+    if (!isSupabaseConfigured) {
+      setAuthLoading(false);
+      return;
+    }
+    supabase.auth.getSession().then(({ data }) => {
+      loadProfile(data.session?.user ?? null).finally(() => setAuthLoading(false));
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
+      loadProfile(sess?.user ?? null);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, [loadProfile]);
+
+  // Load this user's resume whenever they log in
+  useEffect(() => {
+    if (!isSupabaseConfigured || !session) {
       setResumeSkills([]);
       setResumeName("");
       return;
     }
-    const resumeData = readJSON(LS_RESUME_PREFIX + session.id, { skills: [], fileName: "" });
-    setResumeSkills(resumeData.skills || []);
-    setResumeName(resumeData.fileName || "");
-  }, [session]);
+    supabase
+      .from("resumes")
+      .select("*")
+      .eq("user_id", session.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        setResumeSkills(data?.skills || []);
+        setResumeName(data?.file_name || "");
+      });
+  }, [session?.id]);
 
-  // Keep the shared applications list in sync automatically — polling covers same-tab
-  // updates made elsewhere in the app, and the storage/cf-data-changed listeners give
-  // near-instant updates when the admin (or the user, in another tab) changes something.
+  // Applications: fetch once, then stay in sync automatically via Supabase Realtime —
+  // this is what makes an admin's status change appear for the candidate instantly,
+  // on any device, without polling.
   useEffect(() => {
-    const refresh = () => setAllApplications(readJSON(LS_ALL_APPS, []));
-    refresh();
-    const interval = setInterval(refresh, AUTO_REFRESH_MS);
-    const onStorage = (e) => {
-      if (!e.key || e.key === LS_ALL_APPS) refresh();
-    };
-    const onCustom = (e) => {
-      if (!e.detail?.key || e.detail.key === LS_ALL_APPS) refresh();
-    };
-    window.addEventListener("storage", onStorage);
-    window.addEventListener("cf-data-changed", onCustom);
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener("cf-data-changed", onCustom);
-    };
-  }, []);
+    if (!isSupabaseConfigured || !session) {
+      setAllApplications([]);
+      return;
+    }
+    async function load() {
+      const { data, error } = await supabase
+        .from("applications")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) {
+        console.error(error);
+        return;
+      }
+      setAllApplications((data || []).map(mapAppRow));
+    }
+    load();
 
-  const persistUsers = (next) => {
-    setUsers(next);
-    writeJSON(LS_USERS, next);
-  };
+    const channel = supabase
+      .channel("applications-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "applications" }, load)
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [session?.id]);
+
+  // Admin-only: full list of registered candidates
+  useEffect(() => {
+    if (!isSupabaseConfigured || !session || session.role !== "admin") {
+      setRegisteredUsers([]);
+      return;
+    }
+    supabase
+      .from("profiles")
+      .select("*")
+      .neq("role", "admin")
+      .then(({ data }) => {
+        setRegisteredUsers(
+          (data || []).map((u) => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            createdAt: new Date(u.created_at).getTime(),
+          }))
+        );
+      });
+  }, [session?.id, session?.role]);
 
   const signup = useCallback(
-    ({ name, email, password }) => {
-      const exists = users.some((u) => u.email.toLowerCase() === email.toLowerCase());
-      if (exists) return { ok: false, error: "An account with this email already exists." };
-      const newUser = { id: `u-${Date.now()}`, name, email, password, role: "user", createdAt: Date.now() };
-      const next = [...users, newUser];
-      persistUsers(next);
-      const s = { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role };
-      setSession(s);
-      writeJSON(LS_SESSION, s);
+    async ({ name, email, password }) => {
+      const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { name } } });
+      if (error) return { ok: false, error: error.message };
+      if (data.user) {
+        await supabase.from("profiles").insert({ id: data.user.id, name, email, role: "user" });
+      }
+      if (!data.session) {
+        return { ok: false, error: "Account created. Check your email to confirm it, then log in." };
+      }
+      await loadProfile(data.user);
       return { ok: true };
     },
-    [users]
+    [loadProfile]
   );
 
   const login = useCallback(
-    ({ email, password }) => {
-      const found = users.find(
-        (u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password
-      );
-      if (!found) return { ok: false, error: "Invalid email or password." };
-      const s = { id: found.id, name: found.name, email: found.email, role: found.role };
-      setSession(s);
-      writeJSON(LS_SESSION, s);
+    async ({ email, password }) => {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return { ok: false, error: error.message };
+      await loadProfile(data.user);
       return { ok: true };
     },
-    [users]
+    [loadProfile]
   );
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
     setSession(null);
-    localStorage.removeItem(LS_SESSION);
   }, []);
 
   const saveResume = useCallback(
-    (fileName, skills) => {
+    async (fileName, skills) => {
       if (!session) return;
       setResumeSkills(skills);
       setResumeName(fileName);
-      writeJSON(LS_RESUME_PREFIX + session.id, { fileName, skills });
+      await supabase
+        .from("resumes")
+        .upsert({ user_id: session.id, file_name: fileName, skills }, { onConflict: "user_id" });
     },
     [session]
   );
 
-  // applications = only the logged-in user's own applications, derived from the shared list
   const applications = session ? allApplications.filter((a) => a.userId === session.id) : [];
 
-  const hasApplied = useCallback(
-    (jobId) => applications.some((a) => a.jobId === jobId),
-    [applications]
-  );
+  const hasApplied = useCallback((jobId) => applications.some((a) => a.jobId === jobId), [applications]);
 
   const createApplication = useCallback(
-    (job) => {
+    async (job) => {
       if (!session) return null;
       const record = {
-        id: `APP-${Date.now()}`,
-        userId: session.id,
-        userName: session.name,
-        userEmail: session.email,
-        jobId: job.id,
+        user_id: session.id,
+        user_name: session.name,
+        user_email: session.email,
+        job_id: job.id,
         title: job.title,
         company: job.company,
         city: job.city,
-        matchScore: matchScore(resumeSkills, job.skills),
+        match_score: matchScore(resumeSkills, job.skills),
         stage: "Submitted",
         history: [{ stage: "Submitted", at: Date.now() }],
-        createdAt: Date.now(),
       };
-      const current = readJSON(LS_ALL_APPS, []);
-      const next = [record, ...current];
-      writeJSON(LS_ALL_APPS, next);
-      setAllApplications(next);
-      return record;
+      const { data, error } = await supabase.from("applications").insert(record).select().single();
+      if (error) {
+        console.error(error);
+        return null;
+      }
+      return mapAppRow(data);
     },
     [resumeSkills, session]
   );
 
-  // Admin-only: set any application to any stage (used by the admin console).
-  // Automatically creates an interview room the first time a candidate is moved to "Interview".
-  const setApplicationStage = useCallback((appId, stage) => {
-    const current = readJSON(LS_ALL_APPS, []);
-    const next = current.map((a) => {
-      if (a.id !== appId || a.stage === stage) return a;
-      const patch = { ...a, stage, history: [...a.history, { stage, at: Date.now() }] };
-      if (stage === "Interview" && !patch.interviewRoomId) {
-        patch.interviewRoomId = makeRoomId(a.id);
+  // Admin-only: set any application to any stage. Auto-creates an interview room
+  // the first time a candidate is moved to "Interview".
+  const setApplicationStage = useCallback(
+    async (appId, stage) => {
+      const current = allApplications.find((a) => a.id === appId);
+      if (!current || current.stage === stage) return;
+      const patch = { stage, history: [...current.history, { stage, at: Date.now() }] };
+      if (stage === "Interview" && !current.interviewRoomId) {
+        patch.interview_room_id = makeRoomId(appId);
       }
-      return patch;
-    });
-    writeJSON(LS_ALL_APPS, next);
-    setAllApplications(next);
-  }, []);
+      const { error } = await supabase.from("applications").update(patch).eq("id", appId);
+      if (error) console.error(error);
+    },
+    [allApplications]
+  );
 
-  // Admin-only: move an application one stage forward.
-  const advanceApplication = useCallback((appId) => {
-    const current = readJSON(LS_ALL_APPS, []);
-    const target = current.find((a) => a.id === appId);
-    if (!target) return;
-    const idx = STAGES.indexOf(target.stage);
-    if (idx === -1 || idx >= STAGES.length - 1) return;
-    const next = current.map((a) =>
-      a.id === appId
-        ? { ...a, stage: STAGES[idx + 1], history: [...a.history, { stage: STAGES[idx + 1], at: Date.now() }] }
-        : a
-    );
-    writeJSON(LS_ALL_APPS, next);
-    setAllApplications(next);
-  }, []);
+  const advanceApplication = useCallback(
+    async (appId) => {
+      const current = allApplications.find((a) => a.id === appId);
+      if (!current) return;
+      const idx = STAGES.indexOf(current.stage);
+      if (idx === -1 || idx >= STAGES.length - 1) return;
+      await setApplicationStage(appId, STAGES[idx + 1]);
+    },
+    [allApplications, setApplicationStage]
+  );
 
   const isAdmin = session?.role === "admin";
 
   const adminStats = {
-    totalUsers: users.filter((u) => u.role !== "admin").length,
+    totalUsers: registeredUsers.length,
     totalJobs: ALL_JOBS.length,
     totalApplications: allApplications.length,
   };
+
+  if (!isSupabaseConfigured) {
+    return (
+      <div style={{ padding: 48, textAlign: "center", fontFamily: "sans-serif", color: "#1C1B1F" }}>
+        <h2 style={{ marginBottom: 8 }}>Database not configured</h2>
+        <p style={{ color: "#6B6A72", maxWidth: 420, margin: "0 auto" }}>
+          Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to a .env file locally, and to your
+          Vercel project's Environment Variables, then redeploy.
+        </p>
+      </div>
+    );
+  }
+
+  if (authLoading) {
+    return <div style={{ padding: 48, textAlign: "center", fontFamily: "sans-serif", color: "#6B6A72" }}>Loading...</div>;
+  }
 
   const value = {
     session,
@@ -232,13 +276,13 @@ export function StoreProvider({ children }) {
     resumeName,
     saveResume,
     applications,
-    allApplications, // full shared list — used by the admin console to see every candidate
+    allApplications,
     createApplication,
     advanceApplication,
     setApplicationStage,
     hasApplied,
     adminStats,
-    registeredUsers: users.filter((u) => u.role !== "admin"),
+    registeredUsers,
     AGENT_STEPS,
     STAGES,
     TERMINAL_STAGES,

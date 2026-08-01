@@ -8,10 +8,14 @@ export default function Signup() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const res = signup(form);
+    setError("");
+    setLoading(true);
+    const res = await signup(form);
+    setLoading(false);
     if (!res.ok) {
       setError(res.error);
       return;
@@ -64,8 +68,8 @@ export default function Signup() {
               />
             </div>
             {error && <p className="text-sm text-ember">{error}</p>}
-            <button type="submit" className="btn-ember mt-2">
-              Create account
+            <button type="submit" disabled={loading} className="btn-ember mt-2 disabled:opacity-60">
+              {loading ? "Creating account..." : "Create account"}
             </button>
           </form>
         </div>

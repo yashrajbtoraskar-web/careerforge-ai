@@ -4,14 +4,18 @@ import Logo from "../components/Logo";
 import { useStore } from "../context/StoreContext";
 
 export default function Login() {
-  const { login, isAdmin, session } = useStore();
+  const { login } = useStore();
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const res = login(form);
+    setError("");
+    setLoading(true);
+    const res = await login(form);
+    setLoading(false);
     if (!res.ok) {
       setError(res.error);
       return;
@@ -55,8 +59,8 @@ export default function Login() {
               />
             </div>
             {error && <p className="text-sm text-ember">{error}</p>}
-            <button type="submit" className="btn-ember mt-2">
-              Log in
+            <button type="submit" disabled={loading} className="btn-ember mt-2 disabled:opacity-60">
+              {loading ? "Logging in..." : "Log in"}
             </button>
           </form>
 
