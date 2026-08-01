@@ -4,7 +4,7 @@ import { FileText, Briefcase, Send, TrendingUp } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { ALL_JOBS, matchScore } from "../data/jobs";
 
-const STAGE_COLORS = { Submitted: "#94A0B2", "Under Review": "#0D9488", Interview: "#2952E3", Offer: "#16A34A", Rejected: "#DC2626" };
+const STAGE_COLORS = { Submitted: "#94A0B2", "Under Review": "#059669", Interview: "#4F46E5", Offer: "#16A34A", Rejected: "#DC2626" };
 
 export default function Dashboard() {
   const { session, resumeSkills, applications } = useStore();
@@ -39,14 +39,15 @@ export default function Dashboard() {
       <p className="mt-2 text-sm text-slate">Here's what your agent pipeline has been up to.</p>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={FileText} label="Skills on file" value={resumeSkills.length} accent="ember" />
-        <StatCard icon={TrendingUp} label="Strong matches (60%+)" value={strongMatches} accent="teal" />
-        <StatCard icon={Send} label="Applications sent" value={applications.length} accent="ember" />
+        <StatCard icon={FileText} label="Skills on file" value={resumeSkills.length} accent="ember" to="/resume" />
+        <StatCard icon={TrendingUp} label="Strong matches (60%+)" value={strongMatches} accent="teal" to="/jobs" />
+        <StatCard icon={Send} label="Applications sent" value={applications.length} accent="ember" to="/applications" />
         <StatCard
           icon={Briefcase}
           label="In active stages"
           value={applications.filter((a) => a.stage !== "Submitted").length}
           accent="teal"
+          to="/applications"
         />
       </div>
 
@@ -64,7 +65,7 @@ export default function Dashboard() {
                       <Cell key={entry.name} fill={STAGE_COLORS[entry.name]} stroke="none" />
                     ))}
                   </Pie>
-                  <Tooltip contentStyle={{ background: "#FFFFFF", border: "1px solid #E1E5EB", borderRadius: 8, color: "#111827" }} />
+                  <Tooltip contentStyle={{ background: "#FFFFFF", border: "1px solid #E4DFD5", borderRadius: 8, color: "#1C1B1F" }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -87,11 +88,11 @@ export default function Dashboard() {
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={matchBuckets}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E1E5EB" vertical={false} />
-                  <XAxis dataKey="name" stroke="#64748B" fontSize={12} />
-                  <YAxis stroke="#64748B" fontSize={12} />
-                  <Tooltip contentStyle={{ background: "#FFFFFF", border: "1px solid #E1E5EB", borderRadius: 8, color: "#111827" }} />
-                  <Bar dataKey="value" fill="#2952E3" radius={[6, 6, 0, 0]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E4DFD5" vertical={false} />
+                  <XAxis dataKey="name" stroke="#6B6A72" fontSize={12} />
+                  <YAxis stroke="#6B6A72" fontSize={12} />
+                  <Tooltip contentStyle={{ background: "#FFFFFF", border: "1px solid #E4DFD5", borderRadius: 8, color: "#1C1B1F" }} />
+                  <Bar dataKey="value" fill="#4F46E5" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -119,16 +120,16 @@ const ACCENTS = {
   teal: { bg: "bg-teal/10", text: "text-teal" },
 };
 
-function StatCard({ icon: Icon, label, value, accent }) {
+function StatCard({ icon: Icon, label, value, accent, to }) {
   const a = ACCENTS[accent] || ACCENTS.ember;
   return (
-    <div className="card p-5">
+    <Link to={to} className="card p-5 transition-shadow hover:shadow-ember">
       <div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-lg ${a.bg}`}>
         <Icon size={17} className={a.text} />
       </div>
       <p className="text-2xl font-semibold text-mist">{value}</p>
       <p className="text-xs text-slate">{label}</p>
-    </div>
+    </Link>
   );
 }
 

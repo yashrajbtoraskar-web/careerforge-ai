@@ -22,10 +22,11 @@ const ADMIN_ACTIONS = [
 ];
 
 export default function Admin() {
-  const { adminStats, session, allApplications, setApplicationStage, STAGES, TERMINAL_STAGES } = useStore();
+  const { adminStats, session, allApplications, setApplicationStage, STAGES, TERMINAL_STAGES, registeredUsers } = useStore();
   const allStages = [...STAGES, ...TERMINAL_STAGES];
   const [query, setQuery] = useState("");
   const [stageFilter, setStageFilter] = useState("All");
+  const [showUsers, setShowUsers] = useState(false);
 
   const byType = {};
   ALL_JOBS.forEach((j) => (byType[j.type] = (byType[j.type] || 0) + 1));
@@ -53,16 +54,19 @@ export default function Admin() {
       <p className="mt-2 text-sm text-slate">Signed in as {session?.email} — full read and update access to platform activity.</p>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
-        <div className="card flex items-center gap-4 p-5">
+        <button
+          onClick={() => setShowUsers((v) => !v)}
+          className="card flex items-center gap-4 p-5 text-left transition-shadow hover:shadow-ember"
+        >
           <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-ember/10">
             <Users size={20} className="text-ember" />
           </div>
           <div>
             <p className="text-2xl font-semibold text-mist">{adminStats.totalUsers}</p>
-            <p className="text-xs text-slate">Registered users</p>
+            <p className="text-xs text-slate">Registered users · tap to {showUsers ? "hide" : "view"}</p>
           </div>
-        </div>
-        <div className="card flex items-center gap-4 p-5">
+        </button>
+        <Link to="/jobs" className="card flex items-center gap-4 p-5 transition-shadow hover:shadow-ember">
           <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-teal/10">
             <Briefcase size={20} className="text-teal" />
           </div>
@@ -70,8 +74,8 @@ export default function Admin() {
             <p className="text-2xl font-semibold text-mist">{adminStats.totalJobs.toLocaleString()}</p>
             <p className="text-xs text-slate">Live job listings</p>
           </div>
-        </div>
-        <div className="card flex items-center gap-4 p-5">
+        </Link>
+        <a href="#all-applications" className="card flex items-center gap-4 p-5 transition-shadow hover:shadow-ember">
           <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-ember/10">
             <Send size={20} className="text-ember" />
           </div>
@@ -79,11 +83,45 @@ export default function Admin() {
             <p className="text-2xl font-semibold text-mist">{adminStats.totalApplications}</p>
             <p className="text-xs text-slate">Applications submitted</p>
           </div>
-        </div>
+        </a>
       </div>
 
+      {showUsers && (
+        <div className="card mt-6 p-6">
+          <h3 className="mb-4 font-display text-base font-semibold text-mist">Registered users</h3>
+          {registeredUsers.length === 0 ? (
+            <p className="text-sm text-slate">No candidates have signed up yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[420px] border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-slate">
+                    <th className="py-2 pr-3 font-medium">Name</th>
+                    <th className="py-2 pr-3 font-medium">Email</th>
+                    <th className="py-2 pr-3 font-medium">Applications</th>
+                    <th className="py-2 pr-3 font-medium">Joined</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registeredUsers.map((u) => (
+                    <tr key={u.id} className="border-b border-line/60">
+                      <td className="py-2.5 pr-3 font-medium text-mist">{u.name}</td>
+                      <td className="py-2.5 pr-3 text-slate">{u.email}</td>
+                      <td className="py-2.5 pr-3 text-mist">
+                        {allApplications.filter((a) => a.userId === u.id).length}
+                      </td>
+                      <td className="py-2.5 pr-3 text-slate">{new Date(u.createdAt).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Every candidate's applications, visible only to admin */}
-      <div className="card mt-8 p-6">
+      <div id="all-applications" className="card mt-8 scroll-mt-6 p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="font-display text-base font-semibold text-mist">All candidate applications</h3>
           <div className="flex flex-wrap items-center gap-2">
@@ -185,11 +223,11 @@ export default function Admin() {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={typeData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E1E5EB" vertical={false} />
-                <XAxis dataKey="name" stroke="#64748B" fontSize={12} />
-                <YAxis stroke="#64748B" fontSize={12} />
-                <Tooltip contentStyle={{ background: "#FFFFFF", border: "1px solid #E1E5EB", borderRadius: 8, color: "#111827" }} />
-                <Bar dataKey="value" fill="#0D9488" radius={[6, 6, 0, 0]} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#E4DFD5" vertical={false} />
+                <XAxis dataKey="name" stroke="#6B6A72" fontSize={12} />
+                <YAxis stroke="#6B6A72" fontSize={12} />
+                <Tooltip contentStyle={{ background: "#FFFFFF", border: "1px solid #E4DFD5", borderRadius: 8, color: "#1C1B1F" }} />
+                <Bar dataKey="value" fill="#059669" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -200,11 +238,11 @@ export default function Admin() {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={modeData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E1E5EB" vertical={false} />
-                <XAxis dataKey="name" stroke="#64748B" fontSize={12} />
-                <YAxis stroke="#64748B" fontSize={12} />
-                <Tooltip contentStyle={{ background: "#FFFFFF", border: "1px solid #E1E5EB", borderRadius: 8, color: "#111827" }} />
-                <Bar dataKey="value" fill="#2952E3" radius={[6, 6, 0, 0]} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#E4DFD5" vertical={false} />
+                <XAxis dataKey="name" stroke="#6B6A72" fontSize={12} />
+                <YAxis stroke="#6B6A72" fontSize={12} />
+                <Tooltip contentStyle={{ background: "#FFFFFF", border: "1px solid #E4DFD5", borderRadius: 8, color: "#1C1B1F" }} />
+                <Bar dataKey="value" fill="#4F46E5" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

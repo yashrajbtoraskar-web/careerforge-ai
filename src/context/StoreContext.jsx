@@ -238,6 +238,7 @@ export function StoreProvider({ children }) {
     setApplicationStage,
     hasApplied,
     adminStats,
+    registeredUsers: users.filter((u) => u.role !== "admin"),
     AGENT_STEPS,
     STAGES,
     TERMINAL_STAGES,
