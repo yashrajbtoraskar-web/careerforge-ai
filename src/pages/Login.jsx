@@ -23,7 +23,7 @@ export default function Login() {
     navigate(form.email === "admin@careerforge.ai" ? "/admin" : "/dashboard");
   };
 
-  const fillAdmin = () => setForm({ email: "admin@careerforge.ai", password: "admin1234" });
+  const fillAdmin = () => setForm({ email: "admin@careerforge.ai", password: "vaish1331" });
 
   return (
     <div className="flex min-h-[calc(100vh-64px)] items-center justify-center px-5 py-16">
